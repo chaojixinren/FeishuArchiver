@@ -1,4 +1,4 @@
-# ProjectScribe / 智归档
+# FeishuArchiver
 
 从飞书智能纪要自动提取项目信息并归档到 MySQL。
 
