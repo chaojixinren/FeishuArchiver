@@ -84,6 +84,18 @@ def main():
         for status in archive_status:
             print(f"   {status}")
 
+    # 显示评分结果
+    project_scores = result.get("project_scores", {})
+    next_actions = result.get("next_actions", {})
+
+    if project_scores:
+        print("-" * 50)
+        print("📊 项目评分:")
+        for name, score in project_scores.items():
+            action = next_actions.get(name, "")
+            print(f"   {name}: {score}/10")
+            print(f"      下一步: {action}")
+
     errors = result.get("errors", [])
     if errors:
         print("-" * 50)

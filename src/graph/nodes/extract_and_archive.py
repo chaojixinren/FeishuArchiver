@@ -6,16 +6,13 @@
 [POS]: 使用 LLM 提取项目信息，存入数据库
 """
 
-import os
-import json
-import re
-from typing import Optional
 from pydantic import BaseModel, Field
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 
 from src.graph.state import WorkflowState
 from src.db.database import project_repo
+from src.llm import get_llm_client, parse_json_from_llm_response
+from src.prompts import EXTRACTION_PROMPT
 
 
 class ExtractedProject(BaseModel):
@@ -36,36 +33,6 @@ class ProjectList(BaseModel):
     projects: list[ExtractedProject] = Field(default_factory=list, description="提取的项目列表")
 
 
-EXTRACTION_PROMPT = """你是一个项目信息提取助手。请从以下会议纪要中提取项目相关信息。
-
-会议纪要内容：
-{document_content}
-
-请仔细分析文档，提取所有提到的项目信息。
-
-返回 JSON 格式，包含 projects 数组：
-```json
-{{
-  "projects": [
-    {{
-      "project_name": "项目名称",
-      "project_intro": "项目简介",
-      "project_category": "项目类别",
-      "founder_name": "创始人姓名",
-      "founder_contact": "联系方式",
-      "dx_contact": "DX对接人",
-      "source_channel": "来源渠道"
-    }}
-  ]
-}}
-```
-
-注意：
-- 如果文档中提到了多个项目，请分别提取
-- 如果某个字段没有明确提到，使用空字符串 ""
-- 如果完全没有项目信息，返回 {{"projects": []}}
-- 只返回 JSON，不要其他文字
-"""
 
 
 def extract_projects_with_llm(document_content: str) -> list[dict]:
@@ -78,44 +45,14 @@ def extract_projects_with_llm(document_content: str) -> list[dict]:
     Returns:
         提取的项目信息列表
     """
-    api_key = os.getenv("OPENAI_API_KEY")
-    api_base = os.getenv("OPENAI_API_BASE")
-    model_name = os.getenv("OPENAI_MODEL_NAME", "qwen-plus")
-
-    if not api_key:
-        raise ValueError("未配置 OPENAI_API_KEY 环境变量")
-
-    llm = ChatOpenAI(
-        model=model_name,
-        temperature=0,
-        api_key=api_key,
-        base_url=api_base if api_base else None,
-    )
-
+    llm = get_llm_client()
     prompt = ChatPromptTemplate.from_template(EXTRACTION_PROMPT)
     chain = prompt | llm
 
     response = chain.invoke({"document_content": document_content})
+    data = parse_json_from_llm_response(response.content)
 
-    content = response.content
-
-    try:
-        json_match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
-        else:
-            json_str = content
-
-        json_str = json_str.strip()
-        if not json_str.startswith("{"):
-            json_match = re.search(r"\{.*\}", json_str, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
-
-        data = json.loads(json_str)
-        return data.get("projects", [])
-    except json.JSONDecodeError:
-        return []
+    return data.get("projects", []) if data else []
 
 
 def archive_projects(projects: list[dict], document_id: str) -> list[str]:

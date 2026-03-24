@@ -70,6 +70,15 @@ class Database:
                 return cursor.fetchall()
 
 
+class ProjectStatus:
+    """项目状态常量"""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REVIEWED = "reviewed"
+    REJECTED = "rejected"
+
+
 class ProjectRepository:
     """项目数据仓库"""
 
@@ -102,7 +111,7 @@ class ProjectRepository:
     """
 
     UPDATE_SCORE_SQL = """
-    UPDATE projects SET score = %s, next_action = %s, status = 'reviewed'
+    UPDATE projects SET score = %s, next_action = %s, status = %s
     WHERE id = %s
     """
 
@@ -139,9 +148,11 @@ class ProjectRepository:
         """根据文档ID查询项目"""
         return self.db.fetch_all(self.FIND_BY_DOCUMENT_SQL, (document_id,))
 
-    def update_score(self, project_id: int, score: int, next_action: str) -> int:
+    def update_score(
+        self, project_id: int, score: int, next_action: str, status: str = ProjectStatus.REVIEWED
+    ) -> int:
         """更新项目评分"""
-        return self.db.execute(self.UPDATE_SCORE_SQL, (score, next_action, project_id))
+        return self.db.execute(self.UPDATE_SCORE_SQL, (score, next_action, status, project_id))
 
 
 db = Database()
