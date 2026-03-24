@@ -73,7 +73,7 @@ class TestUpdateProjectScores:
 
         assert len(result) == 1
         assert "✅" in result[0]
-        mock_repo.update_score.assert_called_once_with(1, 8, "安排会议")
+        mock_repo.update_score.assert_called_once_with(1, 8, "安排会议", ProjectStatus.APPROVED)
 
     @patch("src.graph.nodes.score_and_decide.project_repo")
     def test_update_with_high_score(self, mock_repo):
@@ -83,9 +83,7 @@ class TestUpdateProjectScores:
         scores = [{"project_name": "优质项目", "score": 9, "next_action": "立即跟进"}]
         update_project_scores(scores, "doc_123")
 
-        mock_repo.update_score.assert_called_once_with(
-            1, 9, "立即跟进", ProjectStatus.APPROVED
-        )
+        mock_repo.update_score.assert_called_once_with(1, 9, "立即跟进", ProjectStatus.APPROVED)
 
     @patch("src.graph.nodes.score_and_decide.project_repo")
     def test_update_with_low_score(self, mock_repo):
@@ -95,9 +93,7 @@ class TestUpdateProjectScores:
         scores = [{"project_name": "待改进项目", "score": 3, "next_action": "暂缓跟进"}]
         update_project_scores(scores, "doc_123")
 
-        mock_repo.update_score.assert_called_once_with(
-            1, 3, "暂缓跟进", ProjectStatus.REJECTED
-        )
+        mock_repo.update_score.assert_called_once_with(1, 3, "暂缓跟进", ProjectStatus.REJECTED)
 
 
 class TestScoreAndDecideNode:
@@ -181,7 +177,7 @@ class TestWorkflowWithNode3:
         """测试完整工作流（节点1+2+3）"""
         from src.graph.workflow import workflow
 
-        mock_extract.return_value = [{"project_name": "测试项目"}]
+        mock_extract.return_value = ([{"project_name": "测试项目"}], "成功提取项目信息")
         mock_archive_repo.insert.return_value = 1
 
         mock_score.return_value = [

@@ -51,7 +51,7 @@ def parse_json_from_llm_response(content: str) -> Optional[dict]:
         解析后的字典，解析失败返回 None
     """
     try:
-        json_match = re.search(r"```json\s*(\{.*?\})\s*```", content, re.DOTALL)
+        json_match = re.search(r"```json\s*(\{.*\})\s*```", content, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:

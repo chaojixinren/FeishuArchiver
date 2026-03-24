@@ -33,9 +33,7 @@ class ProjectList(BaseModel):
     projects: list[ExtractedProject] = Field(default_factory=list, description="提取的项目列表")
 
 
-
-
-def extract_projects_with_llm(document_content: str) -> list[dict]:
+def extract_projects_with_llm(document_content: str) -> tuple[list[dict], str]:
     """
     使用 LLM 从文档中提取项目信息
 
@@ -43,16 +41,26 @@ def extract_projects_with_llm(document_content: str) -> list[dict]:
         document_content: 文档内容（Markdown格式）
 
     Returns:
-        提取的项目信息列表
+        (项目列表, 状态消息)
+        - 项目列表为空且状态消息以"错误"开头表示解析失败
+        - 项目列表为空且状态消息以"提示"开头表示确实没有项目
     """
     llm = get_llm_client()
     prompt = ChatPromptTemplate.from_template(EXTRACTION_PROMPT)
     chain = prompt | llm
 
     response = chain.invoke({"document_content": document_content})
-    data = parse_json_from_llm_response(response.content)
+    content_str = str(response.content) if response.content else ""
+    data = parse_json_from_llm_response(content_str)
 
-    return data.get("projects", []) if data else []
+    if data is None:
+        return [], f"错误: JSON 解析失败，LLM 响应格式异常。原始响应: {content_str[:200]}..."
+
+    projects = data.get("projects", [])
+    if not projects:
+        return [], "提示: LLM 分析后认为文档中没有项目信息"
+
+    return projects, "成功提取项目信息"
 
 
 def archive_projects(projects: list[dict], document_id: str) -> list[str]:
@@ -97,7 +105,7 @@ def extract_and_archive_node(state: WorkflowState) -> dict:
         状态更新字典
     """
     document_content = state.get("document_content", "")
-    document_id = state.get("document_id", "")
+    document_id = state.get("document_id") or ""
     document_parsed = state.get("document_parsed", False)
 
     if not document_parsed:
@@ -113,14 +121,22 @@ def extract_and_archive_node(state: WorkflowState) -> dict:
         }
 
     try:
-        projects = extract_projects_with_llm(document_content)
+        projects, status_msg = extract_projects_with_llm(document_content)
 
         if not projects:
-            return {
-                "extracted_projects": [],
-                "archive_status": ["提示: 未从文档中提取到项目信息"],
-                "current_node": "extract_and_archive",
-            }
+            if status_msg.startswith("错误"):
+                return {
+                    "extracted_projects": [],
+                    "archive_status": [status_msg],
+                    "errors": [status_msg],
+                    "current_node": "extract_and_archive",
+                }
+            else:
+                return {
+                    "extracted_projects": [],
+                    "archive_status": [status_msg],
+                    "current_node": "extract_and_archive",
+                }
 
         status_list = archive_projects(projects, document_id)
 

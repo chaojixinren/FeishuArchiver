@@ -142,7 +142,10 @@ class TestExtractAndArchiveNode:
     @patch("src.graph.nodes.extract_and_archive.extract_projects_with_llm")
     def test_node_success(self, mock_extract, mock_repo):
         """测试节点成功执行"""
-        mock_extract.return_value = [{"project_name": "测试项目", "founder_name": "张三"}]
+        mock_extract.return_value = (
+            [{"project_name": "测试项目", "founder_name": "张三"}],
+            "成功提取项目信息",
+        )
         mock_repo.insert.return_value = 1
 
         state: WorkflowState = {
@@ -167,7 +170,7 @@ class TestExtractAndArchiveNode:
     @patch("src.graph.nodes.extract_and_archive.extract_projects_with_llm")
     def test_no_projects_extracted(self, mock_extract):
         """测试未提取到项目"""
-        mock_extract.return_value = []
+        mock_extract.return_value = ([], "提示: LLM 分析后认为文档中没有项目信息")
 
         state: WorkflowState = {
             "feishu_url": "https://xxx.feishu.cn/docx/xxx",
@@ -185,7 +188,7 @@ class TestExtractAndArchiveNode:
         result = extract_and_archive_node(state)
 
         assert len(result["extracted_projects"]) == 0
-        assert "未从文档中提取到项目信息" in result["archive_status"][0]
+        assert "LLM 分析后认为文档中没有项目信息" in result["archive_status"][0]
 
 
 class TestDatabaseIntegration:
@@ -250,7 +253,10 @@ class TestWorkflowWithNode2:
         """测试完整工作流"""
         from src.graph.workflow import workflow
 
-        mock_extract.return_value = [{"project_name": "集成测试项目", "founder_name": "测试"}]
+        mock_extract.return_value = (
+            [{"project_name": "集成测试项目", "founder_name": "测试"}],
+            "成功提取项目信息",
+        )
         mock_repo.insert.return_value = 1
 
         initial_state: WorkflowState = {
