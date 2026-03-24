@@ -42,7 +42,7 @@ def parse_json_from_llm_response(content: str) -> Optional[dict]:
 
     支持以下格式：
     - 纯 JSON 对象
-    - 包裹在 ```json ... ``` 中的 JSON
+    - 包裹在 ```json ... ``` 或 ``` ... ``` 中的 JSON
 
     Args:
         content: LLM 响应内容
@@ -51,17 +51,18 @@ def parse_json_from_llm_response(content: str) -> Optional[dict]:
         解析后的字典，解析失败返回 None
     """
     try:
-        json_match = re.search(r"```json\s*(\{.*\})\s*```", content, re.DOTALL)
-        if json_match:
-            json_str = json_match.group(1)
+        # 1. 尝试提取 markdown 代码块内容（支持 ```json 或 ```）
+        code_block = re.search(r"```(?:json)?\s*(.*?)\s*```", content, re.DOTALL)
+        if code_block:
+            json_str = code_block.group(1).strip()
         else:
-            json_str = content
+            json_str = content.strip()
 
-        json_str = json_str.strip()
+        # 2. 如果不是以 { 开头，尝试提取第一个 JSON 对象
         if not json_str.startswith("{"):
-            json_match = re.search(r"\{.*\}", json_str, re.DOTALL)
-            if json_match:
-                json_str = json_match.group(0)
+            match = re.search(r"\{.*\}", json_str, re.DOTALL)
+            if match:
+                json_str = match.group(0)
 
         return json.loads(json_str)
     except (json.JSONDecodeError, AttributeError):
